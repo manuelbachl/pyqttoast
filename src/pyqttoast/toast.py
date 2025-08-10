@@ -1,15 +1,25 @@
 from __future__ import annotations
 
 import math
-from qtpy.QtGui import QGuiApplication, QScreen
-from qtpy.QtCore import Qt, QPropertyAnimation, QPoint, QTimer, QSize, QMargins, QRect, Signal
-from qtpy.QtGui import QPixmap, QIcon, QFont, QFontMetrics
-from qtpy.QtWidgets import QDialog, QPushButton, QLabel, QGraphicsOpacityEffect, QWidget
-from .toast_enums import ToastPreset, ToastIcon, ToastPosition, ToastButtonAlignment
-from .utils import Utils
-from .icon_utils import IconUtils
-from .drop_shadow import DropShadow
+
+from qtpy.QtCore import (
+    QMargins,
+    QPoint,
+    QPropertyAnimation,
+    QRect,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
+from qtpy.QtGui import QFont, QFontMetrics, QGuiApplication, QIcon, QPixmap, QScreen
+from qtpy.QtWidgets import QDialog, QGraphicsOpacityEffect, QLabel, QPushButton, QWidget
+
 from .constants import *
+from .drop_shadow import DropShadow
+from .icon_utils import IconUtils
+from .toast_enums import ToastButtonAlignment, ToastIcon, ToastPosition, ToastPreset
+from .utils import Utils
 
 
 class Toast(QDialog):
@@ -42,8 +52,8 @@ class Toast(QDialog):
         # Init attributes
         self.__duration = 5000
         self.__show_duration_bar = True
-        self.__title = ''
-        self.__text = ''
+        self.__title = ""
+        self.__text = ""
         self.__icon = IconUtils.get_icon_from_enum(ToastIcon.INFORMATION)
         self.__show_icon = False
         self.__icon_size = QSize(18, 18)
@@ -66,14 +76,15 @@ class Toast(QDialog):
         self.__icon_separator_color = DEFAULT_ICON_SEPARATOR_COLOR
         self.__close_button_icon_color = DEFAULT_CLOSE_BUTTON_ICON_COLOR
         self.__duration_bar_color = DEFAULT_ACCENT_COLOR
-        self.__title_font = QFont('Arial', 9, QFont.Weight.Bold)
-        self.__text_font = QFont('Arial', 9)
+        self.__title_font = QFont("Arial", 9, QFont.Weight.Bold)
+        self.__text_font = QFont("Arial", 9)
         self.__margins = QMargins(20, 18, 10, 18)
         self.__icon_margins = QMargins(0, 0, 15, 0)
         self.__icon_section_margins = QMargins(0, 0, 15, 0)
         self.__text_section_margins = QMargins(0, 0, 15, 0)
         self.__close_button_margins = QMargins(0, -8, 0, -8)
         self.__text_section_spacing = 8
+        self.__multiline = False
 
         self.__elapsed_time = 0
         self.__fading_out = False
@@ -99,7 +110,7 @@ class Toast(QDialog):
         self.__close_button = QPushButton(self.__toast_widget)
         self.__close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.__close_button.clicked.connect(self.hide)
-        self.__close_button.setObjectName('toast-close-button')
+        self.__close_button.setObjectName("toast-close-button")
 
         # Title label
         self.__title_label = QLabel(self.__toast_widget)
@@ -109,7 +120,7 @@ class Toast(QDialog):
 
         # Icon (QPushButton instead of QLabel to get better icon quality)
         self.__icon_widget = QPushButton(self.__toast_widget)
-        self.__icon_widget.setObjectName('toast-icon-widget')
+        self.__icon_widget.setObjectName("toast-icon-widget")
 
         # Icon separator
         self.__icon_separator = QWidget(self.__toast_widget)
@@ -117,7 +128,7 @@ class Toast(QDialog):
         # Duration bar container (used to make border radius possible on 4 px high widget)
         self.__duration_bar_container = QWidget(self.__toast_widget)
         self.__duration_bar_container.setFixedHeight(4)
-        self.__duration_bar_container.setStyleSheet('background: transparent;')
+        self.__duration_bar_container.setStyleSheet("background: transparent;")
 
         # Duration bar
         self.__duration_bar = QWidget(self.__duration_bar_container)
@@ -159,7 +170,9 @@ class Toast(QDialog):
         self.__duration_bar_timer.timeout.connect(self.__update_duration_bar)
 
         # Apply stylesheet
-        self.setStyleSheet(open(Utils.get_current_directory() + '/css/toast.css').read())
+        self.setStyleSheet(
+            open(Utils.get_current_directory() + "/css/toast.css").read()
+        )
 
         # Install event filters if position relative to widget and moving with widget
         if Toast.__position_relative_to_widget and Toast.__move_position_with_widget:
@@ -170,12 +183,18 @@ class Toast(QDialog):
         # If moved or resized, update toast position if shown
         if Toast.__position_relative_to_widget and Toast.__move_position_with_widget:
             if event.type() == event.Type.Move or event.type() == event.Type.Resize:
-                if watched == Toast.__position_relative_to_widget or watched in self.__watched_widgets:
+                if (
+                    watched == Toast.__position_relative_to_widget
+                    or watched in self.__watched_widgets
+                ):
                     if self in Toast.__currently_shown:
                         self.__update_position_xy(animate=False)
 
         # One of the parents changed or deleted
-        if event.type() == event.Type.ParentChange or event.type() == event.Type.DeferredDelete:
+        if (
+            event.type() == event.Type.ParentChange
+            or event.type() == event.Type.DeferredDelete
+        ):
             self.__install_watched_widgets_event_filters()
 
         return False
@@ -188,7 +207,11 @@ class Toast(QDialog):
         """
 
         # Reset timer if hovered and resetting is enabled
-        if self.__duration != 0 and self.__duration_timer.isActive() and self.__reset_duration_on_hover:
+        if (
+            self.__duration != 0
+            and self.__duration_timer.isActive()
+            and self.__reset_duration_on_hover
+        ):
             self.__duration_timer.stop()
 
             # Reset duration bar if enabled
@@ -205,7 +228,11 @@ class Toast(QDialog):
         """
 
         # Start timer again when leaving notification and reset is enabled
-        if self.__duration != 0 and not self.__duration_timer.isActive() and self.__reset_duration_on_hover:
+        if (
+            self.__duration != 0
+            and not self.__duration_timer.isActive()
+            and self.__reset_duration_on_hover
+        ):
             self.__duration_timer.start(self.__duration)
 
             # Restart duration bar animation if enabled
@@ -241,21 +268,37 @@ class Toast(QDialog):
             # If not first toast on screen, also do a fade down/up animation
             if len(Toast.__currently_shown) > 1:
                 # Calculate offset if predecessor toast is still in fade down / up animation
-                predecessor_toast = Toast.__currently_shown[Toast.__currently_shown.index(self) - 1]
-                predecessor_target_x, predecessor_target_y = predecessor_toast.__calculate_position()
-                predecessor_target_difference_y = abs(predecessor_toast.y() - predecessor_target_y)
+                predecessor_toast = Toast.__currently_shown[
+                    Toast.__currently_shown.index(self) - 1
+                ]
+                predecessor_target_x, predecessor_target_y = (
+                    predecessor_toast.__calculate_position()
+                )
+                predecessor_target_difference_y = abs(
+                    predecessor_toast.y() - predecessor_target_y
+                )
 
                 # Calculate start position of fade down / up animation based on position
-                if (Toast.__position == ToastPosition.BOTTOM_RIGHT
-                        or Toast.__position == ToastPosition.BOTTOM_LEFT
-                        or Toast.__position == ToastPosition.BOTTOM_MIDDLE):
-                    self.move(x, y - int(self.height() / 1.5) - predecessor_target_difference_y)
+                if (
+                    Toast.__position == ToastPosition.BOTTOM_RIGHT
+                    or Toast.__position == ToastPosition.BOTTOM_LEFT
+                    or Toast.__position == ToastPosition.BOTTOM_MIDDLE
+                ):
+                    self.move(
+                        x,
+                        y - int(self.height() / 1.5) - predecessor_target_difference_y,
+                    )
 
-                elif (Toast.__position == ToastPosition.TOP_RIGHT
-                      or Toast.__position == ToastPosition.TOP_LEFT
-                      or Toast.__position == ToastPosition.TOP_MIDDLE
-                      or Toast.__position == ToastPosition.CENTER):
-                    self.move(x, y + int(self.height() / 1.5) + predecessor_target_difference_y)
+                elif (
+                    Toast.__position == ToastPosition.TOP_RIGHT
+                    or Toast.__position == ToastPosition.TOP_LEFT
+                    or Toast.__position == ToastPosition.TOP_MIDDLE
+                    or Toast.__position == ToastPosition.CENTER
+                ):
+                    self.move(
+                        x,
+                        y + int(self.height() / 1.5) + predecessor_target_difference_y,
+                    )
 
                 # Start fade down / up animation
                 self.__pos_animation = QPropertyAnimation(self, b"pos")
@@ -267,7 +310,9 @@ class Toast(QDialog):
 
             # Fade in
             super().show()
-            self.__fade_in_animation = QPropertyAnimation(self.__opacity_effect, b"opacity")
+            self.__fade_in_animation = QPropertyAnimation(
+                self.__opacity_effect, b"opacity"
+            )
             self.__fade_in_animation.setDuration(self.__fade_in_duration)
             self.__fade_in_animation.setStartValue(0)
             self.__fade_in_animation.setEndValue(1)
@@ -292,7 +337,9 @@ class Toast(QDialog):
     def __fade_out(self):
         """Start the fade out animation"""
 
-        self.__fade_out_animation = QPropertyAnimation(self.__opacity_effect, b"opacity")
+        self.__fade_out_animation = QPropertyAnimation(
+            self.__opacity_effect, b"opacity"
+        )
         self.__fade_out_animation.setDuration(self.__fade_out_duration)
         self.__fade_out_animation.setStartValue(1)
         self.__fade_out_animation.setEndValue(0)
@@ -331,9 +378,12 @@ class Toast(QDialog):
             self.__duration_bar_timer.stop()
             return
 
-        new_chunk_width = math.floor(self.__duration_bar_container.width()
-                                     - self.__elapsed_time / self.__duration
-                                     * self.__duration_bar_container.width())
+        new_chunk_width = math.floor(
+            self.__duration_bar_container.width()
+            - self.__elapsed_time
+            / self.__duration
+            * self.__duration_bar_container.width()
+        )
         self.__duration_bar_chunk.setFixedWidth(new_chunk_width)
 
     def __update_position_xy(self, animate: bool = True):
@@ -393,14 +443,20 @@ class Toast(QDialog):
 
         # Calculate target screen / widget
         if Toast.__position_relative_to_widget is not None:
-            top_level_parent = Utils.get_top_level_parent(Toast.__position_relative_to_widget)
+            top_level_parent = Utils.get_top_level_parent(
+                Toast.__position_relative_to_widget
+            )
             if top_level_parent == Toast.__position_relative_to_widget:
                 return Toast.__position_relative_to_widget.geometry()
 
-            global_pos = top_level_parent.mapToGlobal(Toast.__position_relative_to_widget.pos())
+            global_pos = top_level_parent.mapToGlobal(
+                Toast.__position_relative_to_widget.pos()
+            )
             return QRect(
-                global_pos.x(), global_pos.y(), Toast.__position_relative_to_widget.width(),
-                Toast.__position_relative_to_widget.height()
+                global_pos.x(),
+                global_pos.y(),
+                Toast.__position_relative_to_widget.width(),
+                Toast.__position_relative_to_widget.height(),
             )
         elif Toast.__fixed_screen is not None:
             current_screen = Toast.__fixed_screen
@@ -437,42 +493,72 @@ class Toast(QDialog):
         bounds = self.__get_bounds()
 
         if Toast.__position == ToastPosition.BOTTOM_RIGHT:
-            x = (bounds.width() - self.__toast_widget.width()
-                 - Toast.__offset_x + bounds.x())
-            y = (bounds.height() - self.__toast_widget.height()
-                 - Toast.__offset_y + bounds.y() - y_offset)
+            x = (
+                bounds.width()
+                - self.__toast_widget.width()
+                - Toast.__offset_x
+                + bounds.x()
+            )
+            y = (
+                bounds.height()
+                - self.__toast_widget.height()
+                - Toast.__offset_y
+                + bounds.y()
+                - y_offset
+            )
 
         elif Toast.__position == ToastPosition.BOTTOM_LEFT:
             x = bounds.x() + Toast.__offset_x
-            y = (bounds.height() - self.__toast_widget.height()
-                 - Toast.__offset_y + bounds.y() - y_offset)
+            y = (
+                bounds.height()
+                - self.__toast_widget.height()
+                - Toast.__offset_y
+                + bounds.y()
+                - y_offset
+            )
 
         elif Toast.__position == ToastPosition.BOTTOM_MIDDLE:
-            x = (bounds.x() + bounds.width() / 2 - self.__toast_widget.width() / 2)
-            y = (bounds.height() - self.__toast_widget.height()
-                 - Toast.__offset_y + bounds.y() - y_offset)
+            x = bounds.x() + bounds.width() / 2 - self.__toast_widget.width() / 2
+            y = (
+                bounds.height()
+                - self.__toast_widget.height()
+                - Toast.__offset_y
+                + bounds.y()
+                - y_offset
+            )
 
         elif Toast.__position == ToastPosition.TOP_RIGHT:
-            x = (bounds.width() - self.__toast_widget.width()
-                 - Toast.__offset_x + bounds.x())
-            y = (bounds.y() + Toast.__offset_y + y_offset)
+            x = (
+                bounds.width()
+                - self.__toast_widget.width()
+                - Toast.__offset_x
+                + bounds.x()
+            )
+            y = bounds.y() + Toast.__offset_y + y_offset
 
         elif Toast.__position == ToastPosition.TOP_LEFT:
             x = bounds.x() + Toast.__offset_x
-            y = (bounds.y() + Toast.__offset_y + y_offset)
+            y = bounds.y() + Toast.__offset_y + y_offset
 
         elif Toast.__position == ToastPosition.TOP_MIDDLE:
-            x = (bounds.x() + bounds.width() / 2 - self.__toast_widget.width() / 2)
-            y = (bounds.y() + Toast.__offset_y + y_offset)
+            x = bounds.x() + bounds.width() / 2 - self.__toast_widget.width() / 2
+            y = bounds.y() + Toast.__offset_y + y_offset
 
         elif Toast.__position == ToastPosition.CENTER:
-            x = (bounds.x() + bounds.width() / 2 - self.__toast_widget.width() / 2)
+            x = bounds.x() + bounds.width() / 2 - self.__toast_widget.width() / 2
             if y_offset == 0:
-                y = (bounds.y() + bounds.height() / 2
-                     - self.__toast_widget.height() / 2 + y_offset)
+                y = (
+                    bounds.y()
+                    + bounds.height() / 2
+                    - self.__toast_widget.height() / 2
+                    + y_offset
+                )
             else:
-                y_start = (bounds.y() + bounds.height() / 2
-                           - self.__currently_shown[0].__toast_widget.height() / 2)
+                y_start = (
+                    bounds.y()
+                    + bounds.height() / 2
+                    - self.__currently_shown[0].__toast_widget.height() / 2
+                )
                 y = y_start + y_offset
 
         x = int(x - DROP_SHADOW_SIZE)
@@ -489,52 +575,104 @@ class Toast(QDialog):
         # Calculate title and text width and height
         title_font_metrics = QFontMetrics(self.__title_font)
         title_width = title_font_metrics.width(self.__title_label.text())
-        title_height = title_font_metrics.boundingRect(self.__title_label.text()).height()
+        title_height = title_font_metrics.boundingRect(
+            self.__title_label.text()
+        ).height()
         text_font_metrics = QFontMetrics(self.__text_font)
         text_width = text_font_metrics.width(self.__text_label.text())
         text_height = text_font_metrics.boundingRect(self.__text_label.text()).height()
         text_section_spacing = self.__text_section_spacing
-        if self.__title == '' or self.__text == '':
+        if self.__title == "" or self.__text == "":
             text_section_spacing = 0
 
-        text_section_height = (self.__text_section_margins.top()
-                               + title_height + text_section_spacing
-                               + text_height + self.__text_section_margins.bottom())
+        # Handle multiline text
+        if self.__multiline:
+            self.__title_label.setWordWrap(True)
+            self.__text_label.setWordWrap(True)
+            if self.__title != "":
+                title_height = self.__title_label.sizeHint().height()
+                title_width = self.__title_label.sizeHint().width()
+            if self.__text != "":
+                text_height = self.__text_label.sizeHint().height()
+                text_width = self.__text_label.sizeHint().width()
+        else:
+            self.__title_label.setWordWrap(False)
+            self.__text_label.setWordWrap(False)
+
+        text_section_height = (
+            self.__text_section_margins.top()
+            + title_height
+            + text_section_spacing
+            + text_height
+            + self.__text_section_margins.bottom()
+        )
 
         # Calculate duration bar height
-        duration_bar_height = 0 if not self.__show_duration_bar else self.__duration_bar_container.height()
+        duration_bar_height = (
+            0
+            if not self.__show_duration_bar
+            else self.__duration_bar_container.height()
+        )
 
         # Calculate icon section width and height
         icon_section_width = 0
         icon_section_height = 0
 
         if self.__show_icon:
-            icon_section_width = (self.__icon_section_margins.left()
-                                  + self.__icon_margins.left() + self.__icon_widget.width()
-                                  + self.__icon_margins.right() + self.__icon_separator.width()
-                                  + self.__icon_section_margins.right())
-            icon_section_height = (self.__icon_section_margins.top() + self.__icon_margins.top()
-                                   + self.__icon_widget.height() + self.__icon_margins.bottom()
-                                   + self.__icon_section_margins.bottom())
+            icon_section_width = (
+                self.__icon_section_margins.left()
+                + self.__icon_margins.left()
+                + self.__icon_widget.width()
+                + self.__icon_margins.right()
+                + self.__icon_separator.width()
+                + self.__icon_section_margins.right()
+            )
+            icon_section_height = (
+                self.__icon_section_margins.top()
+                + self.__icon_margins.top()
+                + self.__icon_widget.height()
+                + self.__icon_margins.bottom()
+                + self.__icon_section_margins.bottom()
+            )
 
         # Calculate close button section height
-        close_button_width = self.__close_button.width() if self.__show_close_button else 0
-        close_button_height = self.__close_button.height() if self.__show_close_button else 0
-        close_button_margins = self.__close_button_margins if self.__show_close_button else QMargins(0, 0, 0, 0)
+        close_button_width = (
+            self.__close_button.width() if self.__show_close_button else 0
+        )
+        close_button_height = (
+            self.__close_button.height() if self.__show_close_button else 0
+        )
+        close_button_margins = (
+            self.__close_button_margins
+            if self.__show_close_button
+            else QMargins(0, 0, 0, 0)
+        )
 
-        close_button_section_height = (close_button_margins.top()
-                                       + close_button_height
-                                       + close_button_margins.bottom())
+        close_button_section_height = (
+            close_button_margins.top()
+            + close_button_height
+            + close_button_margins.bottom()
+        )
 
         # Calculate needed width and height
-        width = (self.__margins.left() + icon_section_width + self.__text_section_margins.left()
-                 + max(title_width, text_width) + self.__text_section_margins.right()
-                 + close_button_margins.left() + close_button_width
-                 + close_button_margins.right() + self.__margins.right())
+        width = (
+            self.__margins.left()
+            + icon_section_width
+            + self.__text_section_margins.left()
+            + max(title_width, text_width)
+            + self.__text_section_margins.right()
+            + close_button_margins.left()
+            + close_button_width
+            + close_button_margins.right()
+            + self.__margins.right()
+        )
 
-        height = (self.__margins.top()
-                  + max(icon_section_height, text_section_height, close_button_section_height)
-                  + self.__margins.bottom() + duration_bar_height)
+        height = (
+            self.__margins.top()
+            + max(icon_section_height, text_section_height, close_button_section_height)
+            + self.__margins.bottom()
+            + duration_bar_height
+        )
 
         forced_additional_height = 0
         forced_reduced_height = 0
@@ -542,33 +680,46 @@ class Toast(QDialog):
         # Handle width greater than maximum width
         if width > self.maximumWidth():
             # Enable line break for title and text and recalculate size
-            new_title_text_width = max(title_width, text_width) - (width - self.maximumWidth())
+            new_title_text_width = max(title_width, text_width) - (
+                width - self.maximumWidth()
+            )
             if new_title_text_width > 0:
                 title_width = new_title_text_width
                 text_width = new_title_text_width
 
             self.__title_label.setMinimumWidth(title_width)
             self.__title_label.setWordWrap(True)
-            if self.__title != '':
+            if self.__title != "":
                 title_height = self.__title_label.sizeHint().height()
             self.__title_label.setFixedSize(title_width, title_height)
 
             self.__text_label.setMinimumWidth(text_width)
             self.__text_label.setWordWrap(True)
-            if self.__text != '':
+            if self.__text != "":
                 text_height = self.__text_label.sizeHint().height()
             self.__text_label.setFixedSize(text_width, text_height)
 
             # Recalculate width and height
             width = self.maximumWidth()
 
-            text_section_height = (self.__text_section_margins.top()
-                                   + title_height + text_section_spacing
-                                   + text_height + self.__text_section_margins.bottom())
+            text_section_height = (
+                self.__text_section_margins.top()
+                + title_height
+                + text_section_spacing
+                + text_height
+                + self.__text_section_margins.bottom()
+            )
 
-            height = (self.__margins.top()
-                      + max(icon_section_height, text_section_height, close_button_section_height)
-                      + self.__margins.bottom() + duration_bar_height)
+            height = (
+                self.__margins.top()
+                + max(
+                    icon_section_height,
+                    text_section_height,
+                    close_button_section_height,
+                )
+                + self.__margins.bottom()
+                + duration_bar_height
+            )
 
         # Handle height less than minimum height
         if height < self.minimumHeight():
@@ -577,57 +728,148 @@ class Toast(QDialog):
             self.__text_label.setWordWrap(True)
 
             # Calculate height with initial label width
-            title_width = (self.__title_label.fontMetrics().boundingRect(
-                QRect(0, 0, 0, 0), Qt.TextFlag.TextWordWrap, self.__title_label.text()).width())
-            text_width = (self.__text_label.fontMetrics().boundingRect(
-                QRect(0, 0, 0, 0), Qt.TextFlag.TextWordWrap, self.__text_label.text()).width())
+            title_width = (
+                self.__title_label.fontMetrics()
+                .boundingRect(
+                    QRect(0, 0, 0, 0),
+                    Qt.TextFlag.TextWordWrap,
+                    self.__title_label.text(),
+                )
+                .width()
+            )
+            text_width = (
+                self.__text_label.fontMetrics()
+                .boundingRect(
+                    QRect(0, 0, 0, 0),
+                    Qt.TextFlag.TextWordWrap,
+                    self.__text_label.text(),
+                )
+                .width()
+            )
             temp_width = max(title_width, text_width)
 
-            title_width = (self.__title_label.fontMetrics().boundingRect(
-                QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__title_label.text()).width())
-            if self.__title != '':
-                title_height = (self.__title_label.fontMetrics().boundingRect(
-                    QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__title_label.text()).height())
+            title_width = (
+                self.__title_label.fontMetrics()
+                .boundingRect(
+                    QRect(0, 0, temp_width, 0),
+                    Qt.TextFlag.TextWordWrap,
+                    self.__title_label.text(),
+                )
+                .width()
+            )
+            if self.__title != "":
+                title_height = (
+                    self.__title_label.fontMetrics()
+                    .boundingRect(
+                        QRect(0, 0, temp_width, 0),
+                        Qt.TextFlag.TextWordWrap,
+                        self.__title_label.text(),
+                    )
+                    .height()
+                )
 
-            text_width = (self.__text_label.fontMetrics().boundingRect(
-                QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__text_label.text()).width())
-            if self.__text != '':
-                text_height = (self.__text_label.fontMetrics().boundingRect(
-                    QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__text_label.text()).height())
+            text_width = (
+                self.__text_label.fontMetrics()
+                .boundingRect(
+                    QRect(0, 0, temp_width, 0),
+                    Qt.TextFlag.TextWordWrap,
+                    self.__text_label.text(),
+                )
+                .width()
+            )
+            if self.__text != "":
+                text_height = (
+                    self.__text_label.fontMetrics()
+                    .boundingRect(
+                        QRect(0, 0, temp_width, 0),
+                        Qt.TextFlag.TextWordWrap,
+                        self.__text_label.text(),
+                    )
+                    .height()
+                )
 
-            text_section_height = (self.__text_section_margins.top()
-                                   + title_height + text_section_spacing
-                                   + text_height + self.__text_section_margins.bottom())
+            text_section_height = (
+                self.__text_section_margins.top()
+                + title_height
+                + text_section_spacing
+                + text_height
+                + self.__text_section_margins.bottom()
+            )
 
-            height = (self.__margins.top()
-                      + max(icon_section_height, text_section_height, close_button_section_height)
-                      + self.__margins.bottom() + duration_bar_height)
+            height = (
+                self.__margins.top()
+                + max(
+                    icon_section_height,
+                    text_section_height,
+                    close_button_section_height,
+                )
+                + self.__margins.bottom()
+                + duration_bar_height
+            )
 
             while temp_width <= width:
                 # Recalculate height with different text widths to find optimal value
-                temp_title_width = (self.__title_label.fontMetrics().boundingRect(
-                    QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__title_label.text()).width())
-                temp_title_height = (self.__title_label.fontMetrics().boundingRect(
-                    QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__title_label.text()).height())
-                temp_text_width = (self.__text_label.fontMetrics().boundingRect(
-                    QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__text_label.text()).width())
-                temp_text_height = (self.__text_label.fontMetrics().boundingRect(
-                    QRect(0, 0, temp_width, 0), Qt.TextFlag.TextWordWrap, self.__text_label.text()).height())
+                temp_title_width = (
+                    self.__title_label.fontMetrics()
+                    .boundingRect(
+                        QRect(0, 0, temp_width, 0),
+                        Qt.TextFlag.TextWordWrap,
+                        self.__title_label.text(),
+                    )
+                    .width()
+                )
+                temp_title_height = (
+                    self.__title_label.fontMetrics()
+                    .boundingRect(
+                        QRect(0, 0, temp_width, 0),
+                        Qt.TextFlag.TextWordWrap,
+                        self.__title_label.text(),
+                    )
+                    .height()
+                )
+                temp_text_width = (
+                    self.__text_label.fontMetrics()
+                    .boundingRect(
+                        QRect(0, 0, temp_width, 0),
+                        Qt.TextFlag.TextWordWrap,
+                        self.__text_label.text(),
+                    )
+                    .width()
+                )
+                temp_text_height = (
+                    self.__text_label.fontMetrics()
+                    .boundingRect(
+                        QRect(0, 0, temp_width, 0),
+                        Qt.TextFlag.TextWordWrap,
+                        self.__text_label.text(),
+                    )
+                    .height()
+                )
 
-                if self.__title == '':
+                if self.__title == "":
                     temp_title_height = 0
 
-                if self.__text == '':
+                if self.__text == "":
                     temp_text_height = 0
 
-                temp_text_section_height = (self.__text_section_margins.top()
-                                            + temp_title_height + text_section_spacing
-                                            + temp_text_height + self.__text_section_margins.bottom())
+                temp_text_section_height = (
+                    self.__text_section_margins.top()
+                    + temp_title_height
+                    + text_section_spacing
+                    + temp_text_height
+                    + self.__text_section_margins.bottom()
+                )
 
-                temp_height = (self.__margins.top()
-                               + max(icon_section_height, temp_text_section_height,
-                                     close_button_section_height)
-                               + self.__margins.bottom() + duration_bar_height)
+                temp_height = (
+                    self.__margins.top()
+                    + max(
+                        icon_section_height,
+                        temp_text_section_height,
+                        close_button_section_height,
+                    )
+                    + self.__margins.bottom()
+                    + duration_bar_height
+                )
 
                 # Store values if calculated height is greater than or equal to min height
                 if temp_height >= self.minimumHeight():
@@ -644,10 +886,17 @@ class Toast(QDialog):
                     break
 
             # Recalculate width
-            width = (self.__margins.left() + icon_section_width + self.__text_section_margins.left()
-                     + max(title_width, text_width) + self.__text_section_margins.right()
-                     + close_button_margins.left() + close_button_width
-                     + close_button_margins.right() + self.__margins.right())
+            width = (
+                self.__margins.left()
+                + icon_section_width
+                + self.__text_section_margins.left()
+                + max(title_width, text_width)
+                + self.__text_section_margins.right()
+                + close_button_margins.left()
+                + close_button_width
+                + close_button_margins.right()
+                + self.__margins.right()
+            )
 
             # If min height not met, set height to min height
             if height < self.minimumHeight():
@@ -677,7 +926,9 @@ class Toast(QDialog):
         self.__toast_widget.raise_()
 
         # Calculate max height of all sections
-        max_section_height = max(icon_section_height, text_section_height, close_button_section_height)
+        max_section_height = max(
+            icon_section_height, text_section_height, close_button_section_height
+        )
 
         # Calculate difference between height and height of icon section and text section
         height_icon_section_height_difference = max_section_height - icon_section_height
@@ -685,28 +936,32 @@ class Toast(QDialog):
 
         if self.__show_icon:
             # Move icon
-            self.__icon_widget.move(self.__margins.left()
-                                    + self.__icon_section_margins.left()
-                                    + self.__icon_margins.left(),
-                                    self.__margins.top()
-                                    + self.__icon_section_margins.top()
-                                    + self.__icon_margins.top()
-                                    + math.ceil(height_icon_section_height_difference / 2)
-                                    + math.ceil(forced_additional_height / 2)
-                                    - math.floor(forced_reduced_height / 2))
+            self.__icon_widget.move(
+                self.__margins.left()
+                + self.__icon_section_margins.left()
+                + self.__icon_margins.left(),
+                self.__margins.top()
+                + self.__icon_section_margins.top()
+                + self.__icon_margins.top()
+                + math.ceil(height_icon_section_height_difference / 2)
+                + math.ceil(forced_additional_height / 2)
+                - math.floor(forced_reduced_height / 2),
+            )
 
             # Move and resize icon separator
             self.__icon_separator.setFixedHeight(text_section_height)
-            self.__icon_separator.move(self.__margins.left()
-                                       + self.__icon_section_margins.left()
-                                       + self.__icon_margins.left()
-                                       + self.__icon_widget.width()
-                                       + self.__icon_margins.right(),
-                                       self.__margins.top()
-                                       + self.__icon_section_margins.top()
-                                       + math.ceil(height_text_section_height_difference / 2)
-                                       + math.ceil(forced_additional_height / 2)
-                                       - math.floor(forced_reduced_height / 2))
+            self.__icon_separator.move(
+                self.__margins.left()
+                + self.__icon_section_margins.left()
+                + self.__icon_margins.left()
+                + self.__icon_widget.width()
+                + self.__icon_margins.right(),
+                self.__margins.top()
+                + self.__icon_section_margins.top()
+                + math.ceil(height_text_section_height_difference / 2)
+                + math.ceil(forced_additional_height / 2)
+                - math.floor(forced_reduced_height / 2),
+            )
         else:
             # Hide icon section
             self.__icon_widget.setVisible(False)
@@ -718,79 +973,104 @@ class Toast(QDialog):
 
         # Move title and text labels
         if self.__show_icon:
-            self.__title_label.move(self.__margins.left()
-                                    + self.__icon_section_margins.left()
-                                    + self.__icon_margins.left()
-                                    + self.__icon_widget.width()
-                                    + self.__icon_margins.right()
-                                    + self.__icon_separator.width()
-                                    + self.__icon_section_margins.right()
-                                    + self.__text_section_margins.left(),
-                                    self.__margins.top()
-                                    + self.__text_section_margins.top()
-                                    + math.ceil(height_text_section_height_difference / 2)
-                                    + math.ceil(forced_additional_height / 2)
-                                    - math.floor(forced_reduced_height / 2))
+            self.__title_label.move(
+                self.__margins.left()
+                + self.__icon_section_margins.left()
+                + self.__icon_margins.left()
+                + self.__icon_widget.width()
+                + self.__icon_margins.right()
+                + self.__icon_separator.width()
+                + self.__icon_section_margins.right()
+                + self.__text_section_margins.left(),
+                self.__margins.top()
+                + self.__text_section_margins.top()
+                + math.ceil(height_text_section_height_difference / 2)
+                + math.ceil(forced_additional_height / 2)
+                - math.floor(forced_reduced_height / 2),
+            )
 
-            self.__text_label.move(self.__margins.left()
-                                   + self.__icon_section_margins.left()
-                                   + self.__icon_margins.left()
-                                   + self.__icon_widget.width()
-                                   + self.__icon_margins.right()
-                                   + self.__icon_separator.width()
-                                   + self.__icon_section_margins.right()
-                                   + self.__text_section_margins.left(),
-                                   self.__margins.top()
-                                   + self.__text_section_margins.top()
-                                   + title_height + self.__text_section_spacing
-                                   + math.ceil(height_text_section_height_difference / 2)
-                                   + math.ceil(forced_additional_height / 2)
-                                   - math.floor(forced_reduced_height / 2))
+            self.__text_label.move(
+                self.__margins.left()
+                + self.__icon_section_margins.left()
+                + self.__icon_margins.left()
+                + self.__icon_widget.width()
+                + self.__icon_margins.right()
+                + self.__icon_separator.width()
+                + self.__icon_section_margins.right()
+                + self.__text_section_margins.left(),
+                self.__margins.top()
+                + self.__text_section_margins.top()
+                + title_height
+                + self.__text_section_spacing
+                + math.ceil(height_text_section_height_difference / 2)
+                + math.ceil(forced_additional_height / 2)
+                - math.floor(forced_reduced_height / 2),
+            )
 
         # Position is different if icon hidden
         else:
-            self.__title_label.move(self.__margins.left()
-                                    + self.__text_section_margins.left(),
-                                    self.__margins.top()
-                                    + self.__text_section_margins.top()
-                                    + math.ceil(height_text_section_height_difference / 2)
-                                    + math.ceil(forced_additional_height / 2)
-                                    - math.floor(forced_reduced_height / 2))
+            self.__title_label.move(
+                self.__margins.left() + self.__text_section_margins.left(),
+                self.__margins.top()
+                + self.__text_section_margins.top()
+                + math.ceil(height_text_section_height_difference / 2)
+                + math.ceil(forced_additional_height / 2)
+                - math.floor(forced_reduced_height / 2),
+            )
 
-            self.__text_label.move(self.__margins.left()
-                                   + self.__text_section_margins.left(),
-                                   self.__margins.top()
-                                   + self.__text_section_margins.top()
-                                   + title_height + self.__text_section_spacing
-                                   + math.ceil(height_text_section_height_difference / 2)
-                                   + math.ceil(forced_additional_height / 2)
-                                   - math.floor(forced_reduced_height / 2))
+            self.__text_label.move(
+                self.__margins.left() + self.__text_section_margins.left(),
+                self.__margins.top()
+                + self.__text_section_margins.top()
+                + title_height
+                + self.__text_section_spacing
+                + math.ceil(height_text_section_height_difference / 2)
+                + math.ceil(forced_additional_height / 2)
+                - math.floor(forced_reduced_height / 2),
+            )
 
         # Adjust label position if either title or text is empty
-        if self.__title == '' and self.__text != '':
-            self.__text_label.move(self.__text_label.x(),
-                                   int((height - text_height - duration_bar_height) / 2))
+        if self.__title == "" and self.__text != "":
+            self.__text_label.move(
+                self.__text_label.x(),
+                int((height - text_height - duration_bar_height) / 2),
+            )
 
-        elif self.__title != '' and self.__text == '':
-            self.__title_label.move(self.__title_label.x(),
-                                    int((height - title_height - duration_bar_height) / 2))
+        elif self.__title != "" and self.__text == "":
+            self.__title_label.move(
+                self.__title_label.x(),
+                int((height - title_height - duration_bar_height) / 2),
+            )
 
         # Move close button to top, middle, or bottom position
         if self.__close_button_alignment == ToastButtonAlignment.TOP:
-            self.__close_button.move(width - close_button_width
-                                     - close_button_margins.right() - self.__margins.right(),
-                                     self.__margins.top() + close_button_margins.top())
+            self.__close_button.move(
+                width
+                - close_button_width
+                - close_button_margins.right()
+                - self.__margins.right(),
+                self.__margins.top() + close_button_margins.top(),
+            )
         elif self.__close_button_alignment == ToastButtonAlignment.MIDDLE:
-            self.__close_button.move(width - close_button_width
-                                     - close_button_margins.right() - self.__margins.right(),
-                                     math.ceil((height - close_button_height
-                                               - duration_bar_height) / 2))
+            self.__close_button.move(
+                width
+                - close_button_width
+                - close_button_margins.right()
+                - self.__margins.right(),
+                math.ceil((height - close_button_height - duration_bar_height) / 2),
+            )
         elif self.__close_button_alignment == ToastButtonAlignment.BOTTOM:
-            self.__close_button.move(width - close_button_width
-                                     - close_button_margins.right() - self.__margins.right(),
-                                     height - close_button_height
-                                     - self.__margins.bottom()
-                                     - close_button_margins.bottom() - duration_bar_height)
+            self.__close_button.move(
+                width
+                - close_button_width
+                - close_button_margins.right()
+                - self.__margins.right(),
+                height
+                - close_button_height
+                - self.__margins.bottom()
+                - close_button_margins.bottom()
+                - duration_bar_height,
+            )
 
         # Hide close button if disabled
         if not self.__show_close_button:
@@ -1257,14 +1537,18 @@ class Toast(QDialog):
         self.__stay_on_top = on
 
         if on:
-            self.setWindowFlags(Qt.WindowType.Tool |
-                                Qt.WindowType.CustomizeWindowHint |
-                                Qt.WindowType.FramelessWindowHint |
-                                Qt.WindowType.WindowStaysOnTopHint)
+            self.setWindowFlags(
+                Qt.WindowType.Tool
+                | Qt.WindowType.CustomizeWindowHint
+                | Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+            )
         else:
-            self.setWindowFlags(Qt.WindowType.Tool |
-                                Qt.WindowType.CustomizeWindowHint |
-                                Qt.WindowType.FramelessWindowHint)
+            self.setWindowFlags(
+                Qt.WindowType.Tool
+                | Qt.WindowType.CustomizeWindowHint
+                | Qt.WindowType.FramelessWindowHint
+            )
 
     def getBorderRadius(self) -> int:
         """Get the border radius of the toast
@@ -1356,8 +1640,9 @@ class Toast(QDialog):
             return
 
         self.__icon_color = color
-        recolored_image = IconUtils.recolor_image(QIcon(self.__icon).pixmap(
-                                                  self.__icon_widget.iconSize()).toImage(), color)
+        recolored_image = IconUtils.recolor_image(
+            QIcon(self.__icon).pixmap(self.__icon_widget.iconSize()).toImage(), color
+        )
         self.__icon_widget.setIcon(QIcon(QPixmap(recolored_image)))
 
     def getIconSeparatorColor(self) -> QColor:
@@ -1396,8 +1681,12 @@ class Toast(QDialog):
             return
 
         self.__close_button_icon_color = color
-        recolored_image = IconUtils.recolor_image(QIcon(self.__close_button_icon).pixmap(
-                                                  self.__close_button.iconSize()).toImage(), color)
+        recolored_image = IconUtils.recolor_image(
+            QIcon(self.__close_button_icon)
+            .pixmap(self.__close_button.iconSize())
+            .toImage(),
+            color,
+        )
         self.__close_button.setIcon(QIcon(QPixmap(recolored_image)))
 
     def getDurationBarColor(self) -> QColor:
@@ -1924,6 +2213,24 @@ class Toast(QDialog):
             return
         self.__text_section_spacing = spacing
 
+    def isMultiline(self) -> bool:
+        """Get whether multiline text is enabled
+
+        :return: whether multiline text is enabled
+        """
+
+        return self.__multiline
+
+    def setMultiline(self, on: bool):
+        """Set whether multiline text should be enabled
+
+        :param on: whether multiline text should be enabled
+        """
+
+        if self.__used:
+            return
+        self.__multiline = on
+
     def applyPreset(self, preset: ToastPreset):
         """Apply a style preset to the toast
 
@@ -1948,25 +2255,31 @@ class Toast(QDialog):
             self.setIconColor(ERROR_ACCENT_COLOR)
             self.setDurationBarColor(ERROR_ACCENT_COLOR)
 
-        elif preset == ToastPreset.INFORMATION or preset == ToastPreset.INFORMATION_DARK:
+        elif (
+            preset == ToastPreset.INFORMATION or preset == ToastPreset.INFORMATION_DARK
+        ):
             self.setIcon(ToastIcon.INFORMATION)
             self.setIconColor(INFORMATION_ACCENT_COLOR)
             self.setDurationBarColor(INFORMATION_ACCENT_COLOR)
 
-        if (preset == ToastPreset.SUCCESS
-                or preset == ToastPreset.WARNING
-                or preset == ToastPreset.ERROR
-                or preset == ToastPreset.INFORMATION):
+        if (
+            preset == ToastPreset.SUCCESS
+            or preset == ToastPreset.WARNING
+            or preset == ToastPreset.ERROR
+            or preset == ToastPreset.INFORMATION
+        ):
             self.setBackgroundColor(DEFAULT_BACKGROUND_COLOR)
             self.setCloseButtonIconColor(DEFAULT_CLOSE_BUTTON_ICON_COLOR)
             self.setIconSeparatorColor(DEFAULT_ICON_SEPARATOR_COLOR)
             self.setTitleColor(DEFAULT_TITLE_COLOR)
             self.setTextColor(DEFAULT_TEXT_COLOR)
 
-        elif (preset == ToastPreset.SUCCESS_DARK
-                or preset == ToastPreset.WARNING_DARK
-                or preset == ToastPreset.ERROR_DARK
-                or preset == ToastPreset.INFORMATION_DARK):
+        elif (
+            preset == ToastPreset.SUCCESS_DARK
+            or preset == ToastPreset.WARNING_DARK
+            or preset == ToastPreset.ERROR_DARK
+            or preset == ToastPreset.INFORMATION_DARK
+        ):
             self.setBackgroundColor(DEFAULT_BACKGROUND_COLOR_DARK)
             self.setCloseButtonIconColor(DEFAULT_CLOSE_BUTTON_ICON_COLOR_DARK)
             self.setIconSeparatorColor(DEFAULT_ICON_SEPARATOR_COLOR_DARK)
@@ -1981,32 +2294,41 @@ class Toast(QDialog):
     def __update_stylesheet(self):
         """Update the stylesheet of the toast"""
 
-        self.__toast_widget.setStyleSheet('background: {};'
-                                          'border-radius: {}px;'
-                                          .format(self.__background_color.name(),
-                                                  self.__border_radius))
+        self.__toast_widget.setStyleSheet(
+            "background: {};"
+            "border-radius: {}px;".format(
+                self.__background_color.name(), self.__border_radius
+            )
+        )
 
-        self.__duration_bar.setStyleSheet('background: rgba({}, {}, {}, 100);'
-                                          'border-radius: {}px;'
-                                          .format(self.__duration_bar_color.red(),
-                                                  self.__duration_bar_color.green(),
-                                                  self.__duration_bar_color.blue(),
-                                                  self.__border_radius))
+        self.__duration_bar.setStyleSheet(
+            "background: rgba({}, {}, {}, 100);"
+            "border-radius: {}px;".format(
+                self.__duration_bar_color.red(),
+                self.__duration_bar_color.green(),
+                self.__duration_bar_color.blue(),
+                self.__border_radius,
+            )
+        )
 
-        self.__duration_bar_chunk.setStyleSheet('background: rgba({}, {}, {}, 255);'
-                                                'border-bottom-left-radius: {}px;'
-                                                'border-bottom-right-radius: {}px;'
-                                                .format(self.__duration_bar_color.red(),
-                                                        self.__duration_bar_color.green(),
-                                                        self.__duration_bar_color.blue(),
-                                                        self.__border_radius,
-                                                        self.__border_radius if self.__duration == 0 else 0))
+        self.__duration_bar_chunk.setStyleSheet(
+            "background: rgba({}, {}, {}, 255);"
+            "border-bottom-left-radius: {}px;"
+            "border-bottom-right-radius: {}px;".format(
+                self.__duration_bar_color.red(),
+                self.__duration_bar_color.green(),
+                self.__duration_bar_color.blue(),
+                self.__border_radius,
+                self.__border_radius if self.__duration == 0 else 0,
+            )
+        )
 
-        self.__icon_separator.setStyleSheet('background: {};'
-                                            .format(self.__icon_separator_color.name()))
+        self.__icon_separator.setStyleSheet(
+            "background: {};".format(self.__icon_separator_color.name())
+        )
 
-        self.__title_label.setStyleSheet('color: {};'.format(self.__title_color.name()))
-        self.__text_label.setStyleSheet('color: {};'.format(self.__text_color.name()))
+        self.__title_label.setStyleSheet("color: {};".format(self.__title_color.name()))
+        self.__text_label.setStyleSheet("color: {};".format(self.__text_color.name()))
 
     @staticmethod
     def __update_currently_showing_position_xy(animate: bool = True):
@@ -2297,7 +2619,7 @@ class Toast(QDialog):
     @staticmethod
     def reset():
         """Reset the Toast class completely (reset static attributes
-         to defaults, hide all toasts instantly, and clear queue)"""
+        to defaults, hide all toasts instantly, and clear queue)"""
 
         # Reset static attributes
         Toast.__maximum_on_screen = 3
